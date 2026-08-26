@@ -9,4 +9,9 @@
     <RootNamespace>MediaConverter</RootNamespace>
     <ApplicationIcon>MediaConverter.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="MediaConverterApp.Tests\**" />
+    <EmbeddedResource Remove="MediaConverterApp.Tests\**" />
+    <None Remove="MediaConverterApp.Tests\**" />
+  </ItemGroup>
 </Project>
