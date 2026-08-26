@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Media Converter</title>
+  <meta name="description" content="A modern Windows drag-and-drop media converter for audio and video files.">
+  <style>
+    :root {
+      color-scheme: dark;
+      --black: #0e0d12;
+      --panel: #191621;
+      --surface: #262232;
+      --purple: #894cff;
+      --purple-soft: #4e2a99;
+      --red: #ee364d;
+      --text: #f0edf7;
+      --muted: #a99ebb;
+      --line: rgba(240, 237, 247, 0.14);
+      --shadow: rgba(0, 0, 0, 0.38);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--black);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 16px clamp(18px, 5vw, 72px);
+      background: rgba(14, 13, 18, 0.86);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(18px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+    }
+
+    .brand img {
+      width: 34px;
+      height: 34px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: var(--purple-soft);
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 10px 30px var(--shadow);
+    }
+
+    .button.primary {
+      background: var(--red);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1.08fr);
+      gap: clamp(28px, 5vw, 64px);
+      align-items: center;
+      min-height: calc(100vh - 74px);
+      padding: clamp(54px, 8vw, 96px) clamp(18px, 5vw, 72px) 44px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(3rem, 7vw, 6.6rem);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      max-width: 680px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: clamp(1.05rem, 2vw, 1.25rem);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    .app-frame {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 26px 70px var(--shadow);
+    }
+
+    .window-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #100e16;
+    }
+
+    .dots {
+      display: flex;
+      gap: 7px;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+      background: var(--red);
+    }
+
+    .dot:nth-child(2) {
+      background: var(--purple);
+    }
+
+    .dot:nth-child(3) {
+      background: #6e5cff;
+    }
+
+    .mock-app {
+      padding: 18px;
+    }
+
+    .drop-zone {
+      display: grid;
+      place-items: center;
+      min-height: 116px;
+      border: 2px dashed var(--purple);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1.25rem;
+      font-weight: 700;
+      background: rgba(137, 76, 255, 0.08);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .control {
+      min-height: 42px;
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .queue {
+      margin-top: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 0.8fr 2fr 1.1fr;
+      gap: 12px;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .row:first-child {
+      background: var(--purple-soft);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .row:last-child {
+      border-bottom: 0;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(238, 54, 77, 0.11);
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .mini-button {
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: var(--purple-soft);
+      color: #fff;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    section {
+      padding: 72px clamp(18px, 5vw, 72px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    section h2 {
+      margin: 0 0 26px;
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .feature {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .feature h3 {
+      margin: 0 0 10px;
+      color: var(--text);
+    }
+
+    .feature p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .download {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 22px;
+      align-items: center;
+      background: var(--panel);
+    }
+
+    .download p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    footer {
+      padding: 28px clamp(18px, 5vw, 72px);
+      color: var(--muted);
+    }
+
+    @media (max-width: 940px) {
+      .hero {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+
+      .feature-grid,
+      .download {
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 560px) {
+      .nav {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .row,
+      .summary {
+        grid-template-columns: 1fr;
+      }
+
+      .hero h1 {
+        font-size: 3rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav" aria-label="Main navigation">
+    <a class="brand" href="#">
+      <img src="../MediaConverter.ico" alt="">
+      <span>Media Converter</span>
+    </a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+      <a class="button primary" href="https://github.com/kristo25/MediaConverter/releases/latest">Get the app</a>
+    </div>
+  </nav>
+
+  <main>
+    <section class="hero">
+      <div>
+        <h1>Media Converter</h1>
+        <p>A modern Windows app for converting audio and video files into MP3, WAV, OGG, FLAC, or M4A with drag-and-drop input, queue controls, logs, themes, and safer original-file handling.</p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/kristo25/MediaConverter/releases/latest">Download for Windows</a>
+          <a class="button" href="https://github.com/kristo25/MediaConverter">View on GitHub</a>
+        </div>
+      </div>
+
+      <div class="app-frame" aria-label="Media Converter app preview">
+        <div class="window-bar">
+          <div class="dots" aria-hidden="true">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <strong>Theme: Abyss</strong>
+        </div>
+        <div class="mock-app">
+          <div class="drop-zone">Drop files or folders here</div>
+          <div class="toolbar">
+            <div class="control">MP3</div>
+            <div class="control">Balanced</div>
+            <div class="control">VRC-safe</div>
+            <div class="control">Output folder</div>
+            <div class="control">ffmpeg</div>
+          </div>
+          <div class="queue">
+            <div class="row"><span>Status</span><span>Source</span><span>Destination</span></div>
+            <div class="row"><span>Converted</span><span>clip-preview.mp4</span><span>clip-preview.mp3</span></div>
+            <div class="row"><span>Pending</span><span>avatar-song.flac</span><span>avatar-song.mp3</span></div>
+          </div>
+          <div class="summary">
+            <span>Last run: 12 converted, 0 failed, 1 skipped, 0 cancelled.</span>
+            <span class="mini-button">Open log</span>
+            <span class="mini-button">Clear converted</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <h2>Built for quick conversion runs</h2>
+      <div class="feature-grid">
+        <article class="feature">
+          <h3>Drag-and-drop queue</h3>
+          <p>Add individual files or whole folders, include subfolders, and see conversion status in one place.</p>
+        </article>
+        <article class="feature">
+          <h3>Flexible output</h3>
+          <p>Choose MP3 by default or export to WAV, OGG, FLAC, and M4A with practical quality presets.</p>
+        </article>
+        <article class="feature">
+          <h3>Safer cleanup</h3>
+          <p>Original files are only removed when you enable the option and the converted output exists successfully.</p>
+        </article>
+        <article class="feature">
+          <h3>Modern themes</h3>
+          <p>Switch between black, purple, and red-inspired themes directly in the app.</p>
+        </article>
+        <article class="feature">
+          <h3>Logs and retries</h3>
+          <p>Open the latest conversion log, retry failed items, and clear completed rows after a run.</p>
+        </article>
+        <article class="feature">
+          <h3>Open source</h3>
+          <p>The project is public and released under the MIT License.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="download" class="download">
+      <div>
+        <h2>Download the Windows exe</h2>
+        <p>The release package includes a single-file Windows executable. You still need ffmpeg available on your PC or selected in the app.</p>
+      </div>
+      <a class="button primary" href="https://github.com/kristo25/MediaConverter/releases/latest">Open latest release</a>
+    </section>
+  </main>
+
+  <footer>
+    MIT License. Source and releases are hosted on GitHub.
+  </footer>
+</body>
+</html>
