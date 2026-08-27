@@ -3,31 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Media Converter</title>
+  <title>Media Converter for Windows</title>
   <meta name="description" content="A modern Windows drag-and-drop media converter for audio and video files.">
   <style>
     :root {
       color-scheme: dark;
-      --black: #0e0d12;
-      --panel: #191621;
-      --surface: #262232;
-      --purple: #894cff;
-      --purple-soft: #4e2a99;
-      --red: #ee364d;
-      --text: #f0edf7;
-      --muted: #a99ebb;
-      --line: rgba(240, 237, 247, 0.14);
-      --shadow: rgba(0, 0, 0, 0.38);
+      --bg: #0e0d12;
+      --panel: #1c1726;
+      --surface: #272133;
+      --text: #f5f1fb;
+      --muted: #b9adc8;
+      --faint: #7f718f;
+      --purple: #8b4dff;
+      --purple-2: #5b32b8;
+      --red: #ef3651;
+      --red-2: #b82442;
+      --line: rgba(245, 241, 251, 0.14);
+      --strong-line: rgba(245, 241, 251, 0.24);
+      --shadow: rgba(0, 0, 0, 0.42);
+      --max: 1180px;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
 
     body {
       margin: 0;
       font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--black);
+      background: var(--bg);
       color: var(--text);
       line-height: 1.5;
     }
@@ -37,38 +41,53 @@
       text-decoration: none;
     }
 
-    .nav {
+    .shell {
+      width: min(var(--max), calc(100% - 36px));
+      margin: 0 auto;
+    }
+
+    .topbar {
       position: sticky;
       top: 0;
-      z-index: 5;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-      padding: 16px clamp(18px, 5vw, 72px);
-      background: rgba(14, 13, 18, 0.86);
+      z-index: 10;
+      background: rgba(14, 13, 18, 0.9);
       border-bottom: 1px solid var(--line);
       backdrop-filter: blur(18px);
     }
 
-    .brand {
+    .nav {
+      min-height: 72px;
       display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      display: inline-flex;
       align-items: center;
       gap: 12px;
-      font-weight: 700;
+      font-weight: 800;
     }
 
-    .brand img {
-      width: 34px;
-      height: 34px;
+    .brand img,
+    .window-title img {
+      width: 36px;
+      height: 36px;
     }
 
-    .nav-links {
+    .links {
       display: flex;
       align-items: center;
+      justify-content: flex-end;
       gap: 10px;
       flex-wrap: wrap;
-      justify-content: flex-end;
+    }
+
+    .link {
+      color: var(--muted);
+      font-weight: 650;
+      padding: 9px 10px;
     }
 
     .button {
@@ -77,125 +96,197 @@
       justify-content: center;
       min-height: 42px;
       padding: 10px 16px;
+      border: 1px solid transparent;
       border-radius: 8px;
-      background: var(--purple-soft);
+      background: var(--purple-2);
       color: #fff;
-      font-weight: 700;
-      box-shadow: 0 10px 30px var(--shadow);
+      font-weight: 800;
+      box-shadow: 0 12px 34px var(--shadow);
+      white-space: nowrap;
     }
 
-    .button.primary {
-      background: var(--red);
+    .button.primary { background: var(--red); }
+
+    .button.secondary {
+      border-color: var(--strong-line);
+      background: transparent;
+      box-shadow: none;
+      color: var(--text);
     }
 
     .hero {
+      min-height: calc(100vh - 72px);
       display: grid;
-      grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1.08fr);
-      gap: clamp(28px, 5vw, 64px);
+      grid-template-columns: minmax(0, 0.9fr) minmax(390px, 1.1fr);
       align-items: center;
-      min-height: calc(100vh - 74px);
-      padding: clamp(54px, 8vw, 96px) clamp(18px, 5vw, 72px) 44px;
-      border-bottom: 1px solid var(--line);
+      gap: clamp(30px, 5vw, 72px);
+      padding: clamp(58px, 7vw, 90px) 0 44px;
     }
 
-    .hero h1 {
-      margin: 0;
-      font-size: clamp(3rem, 7vw, 6.6rem);
-      line-height: 0.95;
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 5px 10px;
+      border: 1px solid var(--strong-line);
+      border-radius: 8px;
+      color: var(--muted);
+      font-weight: 750;
+      font-size: 0.9rem;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    h1,
+    h2,
+    h3,
+    p { margin-top: 0; }
+
+    h1 {
+      margin-bottom: 22px;
+      font-size: clamp(3rem, 7vw, 6.25rem);
+      line-height: 0.94;
       letter-spacing: 0;
     }
 
-    .hero p {
-      max-width: 680px;
-      margin: 22px 0 0;
+    h2 {
+      margin-bottom: 0;
+      font-size: clamp(2rem, 4vw, 3.55rem);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 650px;
+      margin-bottom: 0;
       color: var(--muted);
       font-size: clamp(1.05rem, 2vw, 1.25rem);
     }
 
     .actions {
       display: flex;
-      flex-wrap: wrap;
       gap: 12px;
+      flex-wrap: wrap;
       margin-top: 30px;
     }
 
-    .app-frame {
-      min-width: 0;
-      overflow: hidden;
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 34px;
+      max-width: 660px;
+    }
+
+    .stat,
+    .card,
+    .panel,
+    .download-box {
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
-      box-shadow: 0 26px 70px var(--shadow);
     }
 
-    .window-bar {
+    .stat {
+      padding: 14px;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.3rem;
+      line-height: 1.1;
+    }
+
+    .stat span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .preview {
+      border: 1px solid var(--strong-line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+      box-shadow: 0 30px 80px var(--shadow);
+    }
+
+    .preview-bar {
+      min-height: 58px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 18px;
-      padding: 14px 16px;
+      gap: 14px;
+      padding: 12px 14px;
       border-bottom: 1px solid var(--line);
       background: #100e16;
     }
 
-    .dots {
+    .window-title {
       display: flex;
-      gap: 7px;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
     }
 
-    .dot {
-      width: 11px;
-      height: 11px;
-      border-radius: 999px;
-      background: var(--red);
+    .window-title img {
+      width: 28px;
+      height: 28px;
     }
 
-    .dot:nth-child(2) {
-      background: var(--purple);
+    .theme-chip {
+      border-radius: 8px;
+      padding: 6px 10px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 0.88rem;
+      font-weight: 700;
     }
 
-    .dot:nth-child(3) {
-      background: #6e5cff;
-    }
-
-    .mock-app {
+    .app {
       padding: 18px;
     }
 
     .drop-zone {
+      min-height: 108px;
       display: grid;
       place-items: center;
-      min-height: 116px;
       border: 2px dashed var(--purple);
       border-radius: 8px;
-      color: var(--text);
-      font-size: 1.25rem;
-      font-weight: 700;
-      background: rgba(137, 76, 255, 0.08);
+      background: rgba(139, 77, 255, 0.08);
+      font-size: clamp(1.2rem, 2.4vw, 1.55rem);
+      font-weight: 800;
+      text-align: center;
     }
 
     .toolbar {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: 96px 112px 86px 1fr 44px;
       gap: 10px;
-      margin-top: 16px;
+      margin-top: 14px;
     }
 
     .control {
       min-height: 42px;
-      border-radius: 8px;
-      background: var(--surface);
-      color: var(--muted);
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 8px;
-      font-size: 0.9rem;
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--muted);
+      font-weight: 750;
       text-align: center;
+      font-size: 0.9rem;
+    }
+
+    .control.danger {
+      background: var(--red-2);
+      color: #fff;
     }
 
     .queue {
-      margin-top: 16px;
+      margin-top: 14px;
       border: 1px solid var(--line);
       border-radius: 8px;
       overflow: hidden;
@@ -203,229 +294,324 @@
 
     .row {
       display: grid;
-      grid-template-columns: 0.8fr 2fr 1.1fr;
+      grid-template-columns: 0.8fr 1.45fr 1.45fr;
       gap: 12px;
-      padding: 12px;
+      padding: 11px 12px;
       border-bottom: 1px solid var(--line);
       color: var(--muted);
-      font-size: 0.92rem;
+      font-size: 0.88rem;
     }
 
-    .row:first-child {
-      background: var(--purple-soft);
+    .row.header {
+      background: var(--purple-2);
       color: #fff;
-      font-weight: 700;
+      font-weight: 800;
     }
 
-    .row:last-child {
-      border-bottom: 0;
-    }
+    .row:last-child { border-bottom: 0; }
 
     .summary {
       display: grid;
       grid-template-columns: 1fr auto auto;
       gap: 10px;
       align-items: center;
-      margin-top: 16px;
+      margin-top: 14px;
       padding: 12px;
       border-radius: 8px;
-      background: rgba(238, 54, 77, 0.11);
+      background: rgba(239, 54, 81, 0.1);
       color: var(--muted);
-      font-size: 0.92rem;
+      font-size: 0.9rem;
     }
 
-    .mini-button {
-      padding: 8px 10px;
+    .mini {
+      padding: 7px 10px;
       border-radius: 8px;
-      background: var(--purple-soft);
+      background: var(--purple-2);
       color: #fff;
-      font-weight: 700;
+      font-weight: 800;
       white-space: nowrap;
     }
 
     section {
-      padding: 72px clamp(18px, 5vw, 72px);
-      border-bottom: 1px solid var(--line);
+      padding: 74px 0;
+      border-top: 1px solid var(--line);
     }
 
-    section h2 {
-      margin: 0 0 26px;
-      font-size: clamp(2rem, 4vw, 3.5rem);
-      line-height: 1;
-      letter-spacing: 0;
-    }
-
-    .feature-grid {
+    .section-head {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 16px;
+      grid-template-columns: minmax(0, 0.8fr) minmax(260px, 0.55fr);
+      gap: 32px;
+      align-items: end;
+      margin-bottom: 30px;
     }
 
-    .feature {
-      padding: 22px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-    }
-
-    .feature h3 {
-      margin: 0 0 10px;
-      color: var(--text);
-    }
-
-    .feature p {
-      margin: 0;
+    .section-head p {
+      margin-bottom: 0;
       color: var(--muted);
     }
 
-    .download {
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      min-height: 178px;
+      padding: 22px;
+    }
+
+    .card strong {
+      display: block;
+      width: 38px;
+      height: 38px;
+      margin-bottom: 18px;
+      border-radius: 8px;
+      background: var(--red);
+      color: #fff;
+      text-align: center;
+      line-height: 38px;
+      font-size: 1rem;
+    }
+
+    .card h3 {
+      margin-bottom: 9px;
+      font-size: 1.1rem;
+    }
+
+    .card p {
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(340px, 1.05fr);
+      gap: 28px;
+      align-items: stretch;
+    }
+
+    .panel {
+      padding: 24px;
+    }
+
+    .panel h3 {
+      margin-bottom: 16px;
+      font-size: 1.4rem;
+    }
+
+    .list {
+      display: grid;
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .list li {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--muted);
+    }
+
+    .download-box {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 22px;
       align-items: center;
-      background: var(--panel);
+      padding: 26px;
+      border-color: var(--strong-line);
     }
 
-    .download p {
-      margin: 0;
+    .download-box p {
+      max-width: 680px;
+      margin-bottom: 0;
       color: var(--muted);
+    }
+
+    .note {
+      margin-top: 16px;
+      color: var(--faint);
+      font-size: 0.94rem;
     }
 
     footer {
-      padding: 28px clamp(18px, 5vw, 72px);
+      padding: 28px 0 36px;
+      border-top: 1px solid var(--line);
       color: var(--muted);
     }
 
-    @media (max-width: 940px) {
-      .hero {
-        grid-template-columns: 1fr;
-        min-height: auto;
-      }
-
-      .feature-grid,
-      .download {
-        grid-template-columns: 1fr;
-      }
-
-      .toolbar {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
     }
 
-    @media (max-width: 560px) {
+    @media (max-width: 980px) {
+      .hero,
+      .section-head,
+      .split,
+      .download-box {
+        grid-template-columns: 1fr;
+      }
+
+      .hero { min-height: auto; }
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 640px) {
       .nav {
         align-items: flex-start;
         flex-direction: column;
+        padding: 14px 0;
       }
 
+      .links { justify-content: flex-start; }
+
+      .stats,
+      .cards,
+      .toolbar,
       .row,
       .summary {
         grid-template-columns: 1fr;
       }
 
-      .hero h1 {
-        font-size: 3rem;
-      }
+      .hero { padding-top: 38px; }
+      h1 { font-size: 3.15rem; }
     }
   </style>
 </head>
 <body>
-  <nav class="nav" aria-label="Main navigation">
-    <a class="brand" href="#">
-      <img src="MediaConverter.ico" alt="">
-      <span>Media Converter</span>
-    </a>
-    <div class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#download">Download</a>
-      <a class="button primary" href="https://github.com/kristo25/MediaConverterApp/releases/latest">Get the app</a>
+  <header class="topbar">
+    <div class="shell nav">
+      <a class="brand" href="#">
+        <img src="MediaConverter.ico" alt="">
+        <span>Media Converter</span>
+      </a>
+      <div class="links">
+        <a class="link" href="#features">Features</a>
+        <a class="link" href="#safety">Safety</a>
+        <a class="link" href="#download">Download</a>
+        <a class="button primary" href="https://github.com/kristo25/MediaConverterApp/releases/latest">Get Windows exe</a>
+      </div>
     </div>
-  </nav>
+  </header>
 
   <main>
-    <section class="hero">
-      <div>
-        <h1>Media Converter</h1>
-        <p>A modern Windows app for converting audio and video files into MP3, WAV, OGG, FLAC, or M4A with drag-and-drop input, queue controls, logs, themes, and safer original-file handling.</p>
+    <div class="shell hero">
+      <section aria-label="Media Converter overview">
+        <span class="eyebrow">Open-source Windows media converter</span>
+        <h1>Convert audio and video files without wrestling ffmpeg.</h1>
+        <p class="lead">Drop files or folders, choose an output format, and run a clear conversion queue with logs, retries, themes, and safer cleanup controls built for everyday VRChat audio prep.</p>
         <div class="actions">
-          <a class="button primary" href="https://github.com/kristo25/MediaConverterApp/releases/latest">Download for Windows</a>
-          <a class="button" href="https://github.com/kristo25/MediaConverterApp">View on GitHub</a>
+          <a class="button primary" href="https://github.com/kristo25/MediaConverterApp/releases/latest">Download latest release</a>
+          <a class="button secondary" href="https://github.com/kristo25/MediaConverterApp">View source</a>
         </div>
-      </div>
-
-      <div class="app-frame" aria-label="Media Converter app preview">
-        <div class="window-bar">
-          <div class="dots" aria-hidden="true">
-            <span class="dot"></span>
-            <span class="dot"></span>
-            <span class="dot"></span>
+        <div class="stats" aria-label="Project highlights">
+          <div class="stat">
+            <strong>5 formats</strong>
+            <span>MP3, WAV, OGG, FLAC, M4A</span>
           </div>
-          <strong>Theme: Abyss</strong>
+          <div class="stat">
+            <strong>MIT</strong>
+            <span>Public open-source license</span>
+          </div>
+          <div class="stat">
+            <strong>1 exe</strong>
+            <span>No installer required</span>
+          </div>
         </div>
-        <div class="mock-app">
+      </section>
+
+      <aside class="preview" aria-label="Media Converter app preview">
+        <div class="preview-bar">
+          <div class="window-title">
+            <img src="MediaConverter.ico" alt="">
+            <span>Media Converter</span>
+          </div>
+          <span class="theme-chip">Theme: Abyss</span>
+        </div>
+        <div class="app">
           <div class="drop-zone">Drop files or folders here</div>
           <div class="toolbar">
             <div class="control">MP3</div>
             <div class="control">Balanced</div>
-            <div class="control">VRC-safe</div>
-            <div class="control">Output folder</div>
-            <div class="control">ffmpeg</div>
+            <div class="control danger">Convert</div>
+            <div class="control">Recent folder</div>
+            <div class="control">Settings</div>
           </div>
           <div class="queue">
-            <div class="row"><span>Status</span><span>Source</span><span>Destination</span></div>
-            <div class="row"><span>Converted</span><span>clip-preview.mp4</span><span>clip-preview.mp3</span></div>
-            <div class="row"><span>Pending</span><span>avatar-song.flac</span><span>avatar-song.mp3</span></div>
+            <div class="row header"><span>Status</span><span>Source</span><span>Destination</span></div>
+            <div class="row"><span>Converted</span><span>intro-video.mp4</span><span>intro-video.mp3</span></div>
+            <div class="row"><span>Pending</span><span>avatar-loop.flac</span><span>avatar-loop.ogg</span></div>
+            <div class="row"><span>Skipped</span><span>voice-take.wav</span><span>already exists</span></div>
           </div>
           <div class="summary">
-            <span>Last run: 12 converted, 0 failed, 1 skipped, 0 cancelled.</span>
-            <span class="mini-button">Open log</span>
-            <span class="mini-button">Clear converted</span>
+            <span>Last run: 12 converted, 0 failed, 1 skipped.</span>
+            <span class="mini">Open log</span>
+            <span class="mini">Retry failed</span>
           </div>
+        </div>
+      </aside>
+    </div>
+
+    <section id="features">
+      <div class="shell">
+        <div class="section-head">
+          <h2>Focused on batch conversion, not clutter.</h2>
+          <p>The interface keeps the main workflow visible while advanced options live in Settings: naming rules, ffmpeg path, output folders, overwrite behavior, and local data cleanup.</p>
+        </div>
+        <div class="cards">
+          <article class="card"><strong>01</strong><h3>Drag files or folders</h3><p>Add individual media files, whole folders, and subfolders without managing command-line arguments.</p></article>
+          <article class="card"><strong>02</strong><h3>Pick practical output</h3><p>Use MP3 by default, or switch to WAV, OGG, FLAC, and M4A with simple quality presets.</p></article>
+          <article class="card"><strong>03</strong><h3>Keep naming predictable</h3><p>Use same-name output, append converted suffixes, auto-number conflicts, or create VRC-safe filenames.</p></article>
+          <article class="card"><strong>04</strong><h3>Review every run</h3><p>Open logs, retry failed items, clear converted rows, and keep a readable queue history while working.</p></article>
+          <article class="card"><strong>05</strong><h3>Clean local app data</h3><p>Remove saved settings, app logs, and ffmpeg downloaded by the app without deleting converted media.</p></article>
+          <article class="card"><strong>06</strong><h3>Switch themes</h3><p>Choose between dark black, purple, and red-forward themes directly in the app.</p></article>
         </div>
       </div>
     </section>
 
-    <section id="features">
-      <h2>Built for quick conversion runs</h2>
-      <div class="feature-grid">
-        <article class="feature">
-          <h3>Drag-and-drop queue</h3>
-          <p>Add individual files or whole folders, include subfolders, and see conversion status in one place.</p>
-        </article>
-        <article class="feature">
-          <h3>Flexible output</h3>
-          <p>Choose MP3 by default or export to WAV, OGG, FLAC, and M4A with practical quality presets.</p>
-        </article>
-        <article class="feature">
-          <h3>Safer cleanup</h3>
-          <p>Original files are only removed when you enable the option and the converted output exists successfully.</p>
-        </article>
-        <article class="feature">
-          <h3>Modern themes</h3>
-          <p>Switch between black, purple, and red-inspired themes directly in the app.</p>
-        </article>
-        <article class="feature">
-          <h3>Logs and retries</h3>
-          <p>Open the latest conversion log, retry failed items, and clear completed rows after a run.</p>
-        </article>
-        <article class="feature">
-          <h3>Open source</h3>
-          <p>The project is public and released under the MIT License.</p>
-        </article>
+    <section id="safety">
+      <div class="shell split">
+        <div class="panel">
+          <h2>Safer defaults for real files.</h2>
+          <p class="lead">The app is designed to avoid accidental data loss. Originals are preserved by default, and delete-original mode only runs after a successful conversion and output validation.</p>
+        </div>
+        <div class="panel">
+          <h3>What the app stores locally</h3>
+          <ul class="list">
+            <li>Settings and recent folders under LocalAppData.</li>
+            <li>Conversion logs under LocalAppData.</li>
+            <li>Optional ffmpeg files if you use the built-in convenience installer.</li>
+            <li>No converted media files are stored in app data.</li>
+          </ul>
+        </div>
       </div>
     </section>
 
-    <section id="download" class="download">
-      <div>
-        <h2>Download the Windows exe</h2>
-        <p>The release package includes a single-file Windows executable. You still need ffmpeg available on your PC or selected in the app.</p>
+    <section id="download">
+      <div class="shell">
+        <div class="download-box">
+          <div>
+            <h2>Download the Windows executable.</h2>
+            <p>The release includes a self-contained Windows exe. ffmpeg can be selected manually, discovered from PATH, or downloaded through the app's convenience installer.</p>
+            <p class="note">No setup is required. To uninstall, delete the exe. Use Settings &gt; Clear app data first if you want to remove settings, logs, and app-downloaded ffmpeg.</p>
+          </div>
+          <a class="button primary" href="https://github.com/kristo25/MediaConverterApp/releases/latest">Open latest release</a>
+        </div>
       </div>
-      <a class="button primary" href="https://github.com/kristo25/MediaConverterApp/releases/latest">Open latest release</a>
     </section>
   </main>
 
   <footer>
-    MIT License. Source and releases are hosted on GitHub.
+    <div class="shell footer-inner">
+      <span>MIT License. Built for Windows.</span>
+      <a href="https://github.com/kristo25/MediaConverterApp">github.com/kristo25/MediaConverterApp</a>
+    </div>
   </footer>
 </body>
 </html>
