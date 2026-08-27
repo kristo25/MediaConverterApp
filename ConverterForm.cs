@@ -54,12 +54,16 @@ internal sealed partial class ConverterForm : Form
     private readonly Label statusLabel = new();
     private readonly ProgressBar progressBar = new();
     private readonly Button installFfmpegButton = new();
+    private readonly Button settingsButton = new();
+    private readonly Button clearLocalDataButton = new();
+    private Form settingsDialog = null!;
 
     private CancellationTokenSource? conversionCancellation;
     private Process? activeProcess;
     private string? lastLogPath;
     private bool isConverting;
     private bool pauseRequested;
+    private bool isApplyingSettings;
 
     public ConverterForm()
     {
@@ -118,7 +122,7 @@ internal sealed partial class ConverterForm : Form
 
         var main = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = currentTheme.Black, Padding = new Padding(18), RowCount = 7, ColumnCount = 1 };
         main.RowStyles.Add(new RowStyle(SizeType.Absolute, 104));
-        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 136));
+        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
         main.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
         main.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         main.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
@@ -151,6 +155,7 @@ internal sealed partial class ConverterForm : Form
         };
 
         var controls = BuildControlsPanel();
+        BuildSettingsDialog();
         var hintLabel = new Label { Dock = DockStyle.Fill, Text = "Queue actions: right-click rows to remove, retry, or open source/output folders. Logs are saved under LocalAppData.", ForeColor = currentTheme.Muted, TextAlign = ContentAlignment.MiddleLeft };
         StyleGrid();
         ConfigureGridContextMenu();
@@ -185,19 +190,18 @@ internal sealed partial class ConverterForm : Form
 
     private TableLayoutPanel BuildControlsPanel()
     {
-        var controls = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 10, RowCount = 3, BackColor = currentTheme.Black };
+        var controls = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 11, RowCount = 1, BackColor = currentTheme.Black };
         controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104));
         controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112));
         controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 88));
-        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 88));
-        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58));
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58));
         controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
-        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58));
         controls.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 108));
-        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 108));
-        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
-        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 44));
         controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
 
         var addFiles = StyledButton("Add files", currentTheme.Primary);
@@ -209,12 +213,10 @@ internal sealed partial class ConverterForm : Form
 
         ConfigureCombo(formatCombo, ["mp3", "wav", "ogg", "flac", "m4a"]);
         ConfigureCombo(qualityCombo, ["Small file", "Balanced", "High quality", "Custom"]);
-        ConfigureCombo(namingCombo, ["Same name", "Append _converted", "Auto-number conflicts", "VRC-safe filename"]);
         ConfigureCombo(recentFolderCombo, []);
 
-        formatCombo.SelectedIndexChanged += (_, _) => { RefreshGrid(); SaveSettingsFromControls(); };
-        qualityCombo.SelectedIndexChanged += (_, _) => { customAudioText.Enabled = qualityCombo.SelectedItem?.ToString() == "Custom"; RefreshGrid(); SaveSettingsFromControls(); };
-        namingCombo.SelectedIndexChanged += (_, _) => { RefreshGrid(); SaveSettingsFromControls(); };
+        formatCombo.SelectedIndexChanged += (_, _) => { UpdateQualityControlsAvailability(); RefreshGrid(); SaveSettingsFromControls(); };
+        qualityCombo.SelectedIndexChanged += (_, _) => { UpdateQualityControlsAvailability(); RefreshGrid(); SaveSettingsFromControls(); };
         recentFolderCombo.SelectedIndexChanged += (_, _) =>
         {
             if (recentFolderCombo.SelectedItem is string folder && Directory.Exists(folder))
@@ -227,14 +229,49 @@ internal sealed partial class ConverterForm : Form
         customAudioText.Enabled = false;
         customAudioText.TextChanged += (_, _) => SaveSettingsFromControls();
 
+        settingsButton.Text = "⚙";
+        settingsButton.Font = new Font("Segoe UI", 14f);
+        StyleButton(settingsButton, currentTheme.Secondary);
+        settingsButton.Click += (_, _) => ShowSettingsDialog();
+        new ToolTip { InitialDelay = 300 }.SetToolTip(settingsButton, "Settings: naming, output folder, ffmpeg path, safety options");
+
+        controls.Controls.Add(addFiles, 0, 0);
+        controls.Controls.Add(addFolder, 1, 0);
+        controls.Controls.Add(clear, 2, 0);
+        controls.Controls.Add(ThemedLabel("Format", ContentAlignment.MiddleRight), 3, 0);
+        controls.Controls.Add(formatCombo, 4, 0);
+        controls.Controls.Add(ThemedLabel("Quality", ContentAlignment.MiddleRight), 5, 0);
+        controls.Controls.Add(qualityCombo, 6, 0);
+        controls.Controls.Add(customAudioText, 7, 0);
+        controls.Controls.Add(ThemedLabel("Recent", ContentAlignment.MiddleRight), 8, 0);
+        controls.Controls.Add(recentFolderCombo, 9, 0);
+        controls.Controls.Add(settingsButton, 10, 0);
+        return controls;
+    }
+
+    private TableLayoutPanel BuildSettingsPanel()
+    {
+        var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 8, BackColor = currentTheme.Black, Padding = new Padding(16), AutoSize = true };
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
+        for (var i = 0; i < 8; i++)
+        {
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        }
+
+        ConfigureCombo(namingCombo, ["Same name", "Append _converted", "Auto-number conflicts", "VRC-safe filename"]);
+        namingCombo.SelectedIndexChanged += (_, _) => { RefreshGrid(); SaveSettingsFromControls(); };
+
         includeSubfoldersCheck.Text = "Include subfolders";
-        overwriteCheck.Text = "Overwrite";
+        overwriteCheck.Text = "Overwrite existing files";
         deleteOriginalsCheck.Text = "Delete originals after success";
         useOutputFolderCheck.Text = "Use one output folder";
-        preserveFoldersCheck.Text = "Preserve folders";
+        preserveFoldersCheck.Text = "Preserve folder structure";
         foreach (var check in new[] { includeSubfoldersCheck, overwriteCheck, deleteOriginalsCheck, useOutputFolderCheck, preserveFoldersCheck })
         {
             StyleCheck(check);
+            check.TextAlign = ContentAlignment.MiddleLeft;
         }
         includeSubfoldersCheck.CheckedChanged += (_, _) => SaveSettingsFromControls();
         overwriteCheck.CheckedChanged += (_, _) => { RefreshGrid(); SaveSettingsFromControls(); };
@@ -255,41 +292,148 @@ internal sealed partial class ConverterForm : Form
         StyleTextBox(ffmpegPathText);
         ffmpegPathText.TextChanged += (_, _) => { UpdateFfmpegStatus(); SaveSettingsFromControls(); };
 
-        browseOutputButton.Text = "Output";
+        browseOutputButton.Text = "Browse";
         StyleButton(browseOutputButton, currentTheme.Secondary);
         browseOutputButton.Enabled = false;
         browseOutputButton.Click += (_, _) => ChooseOutputFolder();
-        browseFfmpegButton.Text = "ffmpeg";
+        browseFfmpegButton.Text = "Browse";
         StyleButton(browseFfmpegButton, currentTheme.Secondary);
         browseFfmpegButton.Click += (_, _) => ChooseFfmpegPath();
+        clearLocalDataButton.Text = "Clear app data";
+        StyleButton(clearLocalDataButton, currentTheme.Danger);
+        clearLocalDataButton.Click += (_, _) => ClearLocalAppData();
 
-        controls.Controls.Add(addFiles, 0, 0);
-        controls.Controls.Add(addFolder, 1, 0);
-        controls.Controls.Add(clear, 2, 0);
-        controls.Controls.Add(ThemedLabel("Format", ContentAlignment.MiddleRight), 3, 0);
-        controls.Controls.Add(formatCombo, 4, 0);
-        controls.Controls.Add(ThemedLabel("Quality", ContentAlignment.MiddleRight), 5, 0);
-        controls.Controls.Add(qualityCombo, 6, 0);
-        controls.Controls.Add(customAudioText, 7, 0);
-        controls.Controls.Add(browseOutputButton, 8, 0);
-        controls.Controls.Add(browseFfmpegButton, 9, 0);
-        controls.Controls.Add(overwriteCheck, 0, 1);
-        controls.Controls.Add(deleteOriginalsCheck, 1, 1);
-        controls.SetColumnSpan(deleteOriginalsCheck, 3);
-        controls.Controls.Add(includeSubfoldersCheck, 4, 1);
-        controls.Controls.Add(useOutputFolderCheck, 5, 1);
-        controls.Controls.Add(preserveFoldersCheck, 6, 1);
-        controls.Controls.Add(outputFolderText, 7, 1);
-        controls.SetColumnSpan(outputFolderText, 3);
-        controls.Controls.Add(ThemedLabel("Naming", ContentAlignment.MiddleRight), 0, 2);
-        controls.Controls.Add(namingCombo, 1, 2);
-        controls.SetColumnSpan(namingCombo, 2);
-        controls.Controls.Add(ThemedLabel("Recent", ContentAlignment.MiddleRight), 3, 2);
-        controls.Controls.Add(recentFolderCombo, 4, 2);
-        controls.SetColumnSpan(recentFolderCombo, 3);
-        controls.Controls.Add(ffmpegPathText, 7, 2);
-        controls.SetColumnSpan(ffmpegPathText, 3);
-        return controls;
+        panel.Controls.Add(ThemedLabel("ffmpeg path", ContentAlignment.MiddleLeft), 0, 0);
+        panel.Controls.Add(ffmpegPathText, 1, 0);
+        panel.Controls.Add(browseFfmpegButton, 2, 0);
+        panel.Controls.Add(ThemedLabel("Naming", ContentAlignment.MiddleLeft), 0, 1);
+        panel.Controls.Add(namingCombo, 1, 1);
+        panel.Controls.Add(useOutputFolderCheck, 0, 2);
+        panel.SetColumnSpan(useOutputFolderCheck, 1);
+        panel.Controls.Add(outputFolderText, 1, 2);
+        panel.Controls.Add(browseOutputButton, 2, 2);
+        panel.Controls.Add(preserveFoldersCheck, 0, 3);
+        panel.SetColumnSpan(preserveFoldersCheck, 3);
+        panel.Controls.Add(includeSubfoldersCheck, 0, 4);
+        panel.SetColumnSpan(includeSubfoldersCheck, 3);
+        panel.Controls.Add(overwriteCheck, 0, 5);
+        panel.SetColumnSpan(overwriteCheck, 3);
+        panel.Controls.Add(deleteOriginalsCheck, 0, 6);
+        panel.SetColumnSpan(deleteOriginalsCheck, 3);
+        panel.Controls.Add(ThemedLabel("Local data", ContentAlignment.MiddleLeft), 0, 7);
+        panel.Controls.Add(clearLocalDataButton, 1, 7);
+        panel.SetColumnSpan(clearLocalDataButton, 2);
+
+        var toolTip = new ToolTip { AutoPopDelay = 8000, InitialDelay = 300, ReshowDelay = 100 };
+        toolTip.SetToolTip(ffmpegPathText, "Path to ffmpeg.exe. Leave blank to auto-detect from PATH.");
+        toolTip.SetToolTip(namingCombo, "How converted files are named relative to the source file.");
+        toolTip.SetToolTip(useOutputFolderCheck, "Save every converted file into one folder instead of next to its source.");
+        toolTip.SetToolTip(preserveFoldersCheck, "When using one output folder, keep the same subfolder structure as the sources.");
+        toolTip.SetToolTip(includeSubfoldersCheck, "When adding a folder, also scan its subfolders for media files.");
+        toolTip.SetToolTip(overwriteCheck, "Replace an existing output file instead of skipping that item.");
+        toolTip.SetToolTip(deleteOriginalsCheck, "Delete the source file, but only after the converted output is verified playable.");
+        toolTip.SetToolTip(clearLocalDataButton, "Deletes this app's settings, logs, and ffmpeg downloaded by the app. It does not delete converted files or the app exe.");
+        return panel;
+    }
+
+    // Built eagerly (not lazily on first open): the controls it hosts - namingCombo above all -
+    // must have their Items populated before ApplySettingsToControls() runs right after BuildUi(),
+    // or a saved naming preference silently reverts to the default every launch (real regression
+    // this caught: SelectedItem = "..." is a no-op against an empty, not-yet-configured combo).
+    private void BuildSettingsDialog()
+    {
+        settingsDialog = new Form
+        {
+            Text = "Settings",
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            ShowInTaskbar = false,
+            ClientSize = new Size(540, 416),
+            BackColor = currentTheme.Black,
+            ForeColor = currentTheme.Text,
+            Font = Font,
+        };
+        var panel = BuildSettingsPanel();
+        panel.Dock = DockStyle.Fill;
+        var closeButton = StyledButton("Close", currentTheme.Primary);
+        closeButton.Dock = DockStyle.Bottom;
+        closeButton.Height = 40;
+        closeButton.Click += (_, _) => settingsDialog.Close();
+        settingsDialog.Controls.Add(panel);
+        settingsDialog.Controls.Add(closeButton);
+    }
+
+    private void ShowSettingsDialog() => settingsDialog.ShowDialog(this);
+
+    private static string GetLocalDataRoot() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MediaConverter");
+
+    private void ClearLocalAppData()
+    {
+        if (isConverting)
+        {
+            MessageBox.Show(this, "Stop the current conversion before clearing local app data.", "Media Converter", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var localDataRoot = GetLocalDataRoot();
+        var confirm = MessageBox.Show(
+            this,
+            $"This clears this app's settings, logs, and ffmpeg downloaded by the app from:\n\n{localDataRoot}\n\nIt does not delete converted files or this app's .exe.\n\nContinue?",
+            "Clear local app data",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning);
+        if (confirm != DialogResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            if (Directory.Exists(localDataRoot))
+            {
+                Directory.Delete(localDataRoot, recursive: true);
+            }
+            ResetSettingsToDefaults();
+            lastLogPath = null;
+            openLastLogButton.Enabled = false;
+            summaryLabel.Text = "Local app data cleared. Settings were reset for this session.";
+            statusLabel.Text = "Local app data cleared.";
+            MessageBox.Show(this, "Local app data was cleared. Settings have been reset for this session.", "Media Converter", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("ClearLocalAppData", ex);
+            MessageBox.Show(this, $"Could not clear local app data: {ex.Message}", "Clear failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void ResetSettingsToDefaults()
+    {
+        var defaults = new AppSettings();
+        settings.Theme = defaults.Theme;
+        settings.OutputFormat = defaults.OutputFormat;
+        settings.QualityPreset = defaults.QualityPreset;
+        settings.CustomAudioValue = defaults.CustomAudioValue;
+        settings.NamingRule = defaults.NamingRule;
+        settings.FfmpegPath = defaults.FfmpegPath;
+        settings.LastInputFolder = defaults.LastInputFolder;
+        settings.LastOutputFolder = defaults.LastOutputFolder;
+        settings.IncludeSubfolders = defaults.IncludeSubfolders;
+        settings.Overwrite = defaults.Overwrite;
+        settings.DeleteOriginals = defaults.DeleteOriginals;
+        settings.UseOutputFolder = defaults.UseOutputFolder;
+        settings.PreserveFoldersInOutput = defaults.PreserveFoldersInOutput;
+        settings.RecentFolders.Clear();
+        settings.RecentFolders.AddRange(defaults.RecentFolders);
+        currentTheme = themes[DefaultTheme];
+        ApplySettingsToControls();
+        RefreshRecentFolders();
+        RefreshGrid();
+        ApplyTheme();
+        UpdateFfmpegStatus();
     }
 
     private TableLayoutPanel BuildBottomPanel()
@@ -387,6 +531,16 @@ internal sealed partial class ConverterForm : Form
         combo.Dock = DockStyle.Fill;
     }
 
+    // wav and flac are lossless with a single fixed encoder recipe - Quality/Custom don't apply
+    // to them at all (ConversionLogic.GetEncoderArgs ignores preset for both). Greying the
+    // controls out instead of leaving them clickable-but-inert is a small but real usability fix.
+    private void UpdateQualityControlsAvailability()
+    {
+        var hasQualityPresets = formatCombo.SelectedItem?.ToString() is "mp3" or "ogg" or "m4a";
+        qualityCombo.Enabled = hasQualityPresets;
+        customAudioText.Enabled = hasQualityPresets && qualityCombo.SelectedItem?.ToString() == "Custom";
+    }
+
     private void StyleTextBox(TextBox box)
     {
         box.Dock = DockStyle.Fill;
@@ -397,26 +551,43 @@ internal sealed partial class ConverterForm : Form
 
     private void ApplySettingsToControls()
     {
-        themeCombo.SelectedItem = themes.ContainsKey(settings.Theme) ? settings.Theme : DefaultTheme;
-        formatCombo.SelectedItem = formatCombo.Items.Contains(settings.OutputFormat) ? settings.OutputFormat : "mp3";
-        qualityCombo.SelectedItem = qualityCombo.Items.Contains(settings.QualityPreset) ? settings.QualityPreset : "Balanced";
-        namingCombo.SelectedItem = namingCombo.Items.Contains(settings.NamingRule) ? settings.NamingRule : "Same name";
-        customAudioText.Text = string.IsNullOrWhiteSpace(settings.CustomAudioValue) ? "192k" : settings.CustomAudioValue;
-        includeSubfoldersCheck.Checked = settings.IncludeSubfolders;
-        overwriteCheck.Checked = settings.Overwrite;
-        deleteOriginalsCheck.Checked = settings.DeleteOriginals;
-        useOutputFolderCheck.Checked = settings.UseOutputFolder;
-        preserveFoldersCheck.Checked = settings.PreserveFoldersInOutput;
-        outputFolderText.Text = settings.LastOutputFolder;
-        ffmpegPathText.Text = settings.FfmpegPath;
-        outputFolderText.Enabled = useOutputFolderCheck.Checked;
-        browseOutputButton.Enabled = useOutputFolderCheck.Checked;
-        preserveFoldersCheck.Enabled = useOutputFolderCheck.Checked;
-        customAudioText.Enabled = qualityCombo.SelectedItem?.ToString() == "Custom";
+        // Guarded: each control assignment below can fire a Changed event whose handler calls
+        // SaveSettingsFromControls(), which would read the OTHER controls before they've been
+        // synced from `settings` yet and stomp the shared settings object with stale defaults
+        // (e.g. checkboxes silently ending up unchecked on first run). Suppress saves for the
+        // whole batch and let the caller's own flow persist state normally afterward.
+        isApplyingSettings = true;
+        try
+        {
+            themeCombo.SelectedItem = themes.ContainsKey(settings.Theme) ? settings.Theme : DefaultTheme;
+            formatCombo.SelectedItem = formatCombo.Items.Contains(settings.OutputFormat) ? settings.OutputFormat : "mp3";
+            qualityCombo.SelectedItem = qualityCombo.Items.Contains(settings.QualityPreset) ? settings.QualityPreset : "Balanced";
+            namingCombo.SelectedItem = namingCombo.Items.Contains(settings.NamingRule) ? settings.NamingRule : "Same name";
+            customAudioText.Text = string.IsNullOrWhiteSpace(settings.CustomAudioValue) ? "192k" : settings.CustomAudioValue;
+            includeSubfoldersCheck.Checked = settings.IncludeSubfolders;
+            overwriteCheck.Checked = settings.Overwrite;
+            deleteOriginalsCheck.Checked = settings.DeleteOriginals;
+            useOutputFolderCheck.Checked = settings.UseOutputFolder;
+            preserveFoldersCheck.Checked = settings.PreserveFoldersInOutput;
+            outputFolderText.Text = settings.LastOutputFolder;
+            ffmpegPathText.Text = settings.FfmpegPath;
+            outputFolderText.Enabled = useOutputFolderCheck.Checked;
+            browseOutputButton.Enabled = useOutputFolderCheck.Checked;
+            preserveFoldersCheck.Enabled = useOutputFolderCheck.Checked;
+            UpdateQualityControlsAvailability();
+        }
+        finally
+        {
+            isApplyingSettings = false;
+        }
     }
 
     private void SaveSettingsFromControls()
     {
+        if (isApplyingSettings)
+        {
+            return;
+        }
         try
         {
             settings.Theme = themeCombo.SelectedItem?.ToString() ?? DefaultTheme;
@@ -535,6 +706,10 @@ internal sealed partial class ConverterForm : Form
         ApplyThemeToControls(Controls);
         StyleGrid();
         grid.Invalidate();
+
+        settingsDialog.BackColor = currentTheme.Black;
+        settingsDialog.ForeColor = currentTheme.Text;
+        ApplyThemeToControls(settingsDialog.Controls);
     }
 
     private void ApplyThemeToControls(Control.ControlCollection controls)
@@ -584,8 +759,8 @@ internal sealed partial class ConverterForm : Form
 
     private Color GetButtonColor(Button button) => button.Text switch
     {
-        "Clear" or "Convert" or "Cancel" => currentTheme.Danger,
-        "Add folder" or "Output" or "ffmpeg" or "Open logs" or "Open last log" or "Retry failed" or "Clear converted" or "Pause" or "Resume" or "Help" => currentTheme.Secondary,
+        "Clear" or "Convert" or "Cancel" or "Clear app data" => currentTheme.Danger,
+        "Add folder" or "Browse" or "⚙" or "Open logs" or "Open last log" or "Retry failed" or "Clear converted" or "Pause" or "Resume" or "Help" => currentTheme.Secondary,
         _ => currentTheme.Primary
     };
 

@@ -4,6 +4,10 @@ Modern Windows app for drag-and-drop audio/video conversion.
 
 This is a public open-source project released under the MIT License.
 
+Project page: https://kristo25.github.io/MediaConverterApp/
+
+GitHub repository: https://github.com/kristo25/MediaConverterApp
+
 ## Run
 
 Download `MediaConverter.exe` from the GitHub Releases page, or open the locally published single-file executable:
@@ -62,6 +66,8 @@ The app executable uses `MediaConverter.ico` as its Windows icon.
 - Optional single output folder
 - Optional folder structure preservation when using one output folder
 - Optional ffmpeg.exe path picker
+- Optional convenience installer for the Windows ffmpeg build linked from ffmpeg.org. The installer downloads over HTTPS to local app data, but does not pin a checksum; use the path picker if you prefer to install and verify ffmpeg yourself.
+- Settings action to clear local app data: saved settings, logs, and ffmpeg downloaded by the app.
 
 ## Queue Controls
 
@@ -80,6 +86,12 @@ The app executable uses `MediaConverter.ico` as its Windows icon.
 ## Safety
 
 Original files are only deleted when `Delete originals after success` is checked. The app only deletes after ffmpeg succeeds and the output file exists with non-zero size.
+
+## Uninstall / Cleanup
+
+The single-file app does not require a separate setup or uninstaller. To remove the app, delete `MediaConverter.exe` and the folder you saved it in.
+
+Use `Settings` > `Clear app data` inside the app to remove `%LOCALAPPDATA%\MediaConverter`, including settings, logs, and ffmpeg downloaded by the app. Converted media files are not stored there and are not removed by this action.
 
 ## License
 

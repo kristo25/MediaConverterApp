@@ -14,7 +14,7 @@ internal sealed partial class ConverterForm
         var ffmpeg = GetFfmpegPath();
         if (ffmpeg is null)
         {
-            MessageBox.Show(this, "ffmpeg was not found. Use the ffmpeg button to choose ffmpeg.exe.", "Missing ffmpeg", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, "ffmpeg was not found. Open Settings (⚙) and use Browse to choose ffmpeg.exe, or use Install ffmpeg on the status bar.", "Missing ffmpeg", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
         if (useOutputFolderCheck.Checked && !Directory.Exists(outputFolderText.Text))
@@ -134,7 +134,7 @@ internal sealed partial class ConverterForm
             var ffprobe = GetFfprobePath();
             if (!string.IsNullOrWhiteSpace(ffprobe) && File.Exists(ffprobe))
             {
-                var valid = await Task.Run(() => IsValidMediaFile(ffprobe, item.Destination));
+                var valid = await IsValidMediaFileAsync(ffprobe, item.Destination, conversionCancellation?.Token ?? CancellationToken.None);
                 if (!valid)
                 {
                     item.Message = "Converted, but output failed validation - original kept";
@@ -153,10 +153,20 @@ internal sealed partial class ConverterForm
         }
     }
 
-    private static bool IsValidMediaFile(string ffprobe, string file)
+    /// <summary>
+    /// Runs ffprobe against the freshly-written output and confirms it reports a real duration.
+    /// Reads stdout/stderr concurrently (not sequential ReadToEnd calls) to avoid the classic
+    /// .NET pipe deadlock if ffprobe ever writes enough to stderr to fill its buffer, and is
+    /// bounded by a timeout plus the conversion's own cancellation token so a hung probe can't
+    /// leave the app looking frozen with no way to stop it.
+    /// </summary>
+    private static async Task<bool> IsValidMediaFileAsync(string ffprobe, string file, CancellationToken token)
     {
         try
         {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(15));
+
             using var process = new Process();
             process.StartInfo = new ProcessStartInfo { FileName = ffprobe, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
             foreach (var arg in new[] { "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", file })
@@ -164,9 +174,24 @@ internal sealed partial class ConverterForm
                 process.StartInfo.ArgumentList.Add(arg);
             }
             process.Start();
-            var output = process.StandardOutput.ReadToEnd().Trim();
-            var error = process.StandardError.ReadToEnd().Trim();
-            process.WaitForExit(5000);
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+
+            try
+            {
+                await process.WaitForExitAsync(timeoutCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                return false;
+            }
+
+            var output = (await stdoutTask).Trim();
+            var error = (await stderrTask).Trim();
             if (process.ExitCode != 0 || !string.IsNullOrWhiteSpace(error))
             {
                 return false;
@@ -252,7 +277,7 @@ internal sealed partial class ConverterForm
         return path;
     }
 
-    private static string GetLogRoot() => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MediaConverter", "logs");
+    private static string GetLogRoot() => Path.Combine(GetLocalDataRoot(), "logs");
 
     private void OpenLogsFolder()
     {
@@ -327,9 +352,10 @@ internal sealed partial class ConverterForm
         MessageBox.Show(
             this,
             "Drag files or folders into the top area, or use Add files/Add folder.\n\n" +
-            "Default output is MP3 in the same folder as the source. Use Format, Quality, and Naming to change the result. Use one output folder if you want every converted file saved somewhere else.\n\n" +
+            "Default output is MP3 in the same folder as the source. Use Format and Quality to change the result - Quality doesn't apply to WAV/FLAC since they're lossless.\n\n" +
             "Quality presets choose common ffmpeg audio settings. Custom accepts values such as 192k for bitrate.\n\n" +
-            "Delete originals after success only removes a source file after ffmpeg succeeds and the output file passes validation. Logs and settings are stored in LocalAppData\\MediaConverter.",
+            "Click the ⚙ Settings button for naming rules, a custom output folder, ffmpeg's path, and safety options like Overwrite and Delete originals after success (which only removes a source file after ffmpeg succeeds and the output file passes validation).\n\n" +
+            "Logs and settings are stored in LocalAppData\\MediaConverter. Use Settings > Clear app data to remove settings, logs, and ffmpeg downloaded by the app.",
             "Media Converter Help",
             MessageBoxButtons.OK,
             MessageBoxIcon.Information);

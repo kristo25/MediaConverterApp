@@ -267,41 +267,24 @@ internal sealed partial class ConverterForm
     private string GetOutputPath(string source, string rootFolder)
     {
         var format = (formatCombo.SelectedItem?.ToString() ?? "mp3").ToLowerInvariant();
-        var baseName = Path.GetFileNameWithoutExtension(source);
         var namingRule = namingCombo.SelectedItem?.ToString() ?? "Same name";
-        baseName = ConversionLogic.BuildBaseName(baseName, namingRule);
-        var fileName = baseName + "." + format;
-        var directory = Path.GetDirectoryName(source) ?? "";
-        if (useOutputFolderCheck.Checked)
-        {
-            directory = outputFolderText.Text.Trim();
-            if (preserveFoldersCheck.Checked && !string.IsNullOrWhiteSpace(rootFolder))
-            {
-                directory = Path.Combine(directory, ConversionLogic.GetRelativeDirectory(rootFolder, Path.GetDirectoryName(source) ?? ""));
-            }
-        }
-        var destination = Path.Combine(directory, fileName);
-        return namingRule == "Auto-number conflicts" && (!overwriteCheck.Checked || queue.Count > 1) ? GetUniqueDestination(destination, source) : destination;
-    }
-
-    private string GetUniqueDestination(string destination, string source)
-    {
-        var reserved = queue.Where(item => !item.Source.Equals(source, StringComparison.OrdinalIgnoreCase)).Select(item => item.Destination).Where(path => !string.IsNullOrWhiteSpace(path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (!File.Exists(destination) && !reserved.Contains(destination))
+        var destination = ConversionLogic.BuildOutputPath(
+            source,
+            rootFolder,
+            format,
+            namingRule,
+            useOutputFolderCheck.Checked,
+            outputFolderText.Text,
+            preserveFoldersCheck.Checked);
+        if (namingRule != "Auto-number conflicts" || (overwriteCheck.Checked && queue.Count <= 1))
         {
             return destination;
         }
-        var directory = Path.GetDirectoryName(destination) ?? "";
-        var name = Path.GetFileNameWithoutExtension(destination);
-        var extension = Path.GetExtension(destination);
-        var index = 1;
-        string candidate;
-        do
-        {
-            candidate = Path.Combine(directory, $"{name} ({index}){extension}");
-            index++;
-        } while (File.Exists(candidate) || reserved.Contains(candidate));
-        return candidate;
+
+        var reserved = queue
+            .Where(item => !item.Source.Equals(source, StringComparison.OrdinalIgnoreCase))
+            .Select(item => item.Destination);
+        return ConversionLogic.GetUniqueDestination(destination, source, reserved);
     }
 
     private string[] GetEncoderArgs(string format) =>
@@ -348,11 +331,17 @@ internal sealed partial class ConverterForm
     private void UpdateFfmpegStatus()
     {
         var ffmpeg = GetFfmpegPath();
-        statusLabel.Text = ffmpeg is null ? "ffmpeg not found. Use the ffmpeg button to choose ffmpeg.exe, or Install ffmpeg." : $"Ready. ffmpeg: {ffmpeg}";
+        statusLabel.Text = ffmpeg is null ? "ffmpeg not found. Click Install ffmpeg, or open Settings (⚙) to choose ffmpeg.exe." : $"Ready. ffmpeg: {ffmpeg}";
         installFfmpegButton.Visible = ffmpeg is null;
     }
 
-    private static string GetDurationText(string? ffprobe, string file)
+    /// <summary>
+    /// Reads stdout/stderr concurrently (not sequential ReadToEnd calls) and is bounded by a
+    /// timeout - the same fix applied to IsValidMediaFileAsync. This one redirected stderr but
+    /// never drained it, so if ffprobe ever wrote enough there to fill its pipe buffer while
+    /// stdout was still being read, both sides would block forever with no timeout ever reached.
+    /// </summary>
+    private static async Task<string> GetDurationTextAsync(string? ffprobe, string file)
     {
         if (string.IsNullOrWhiteSpace(ffprobe) || !File.Exists(ffprobe))
         {
@@ -360,6 +349,7 @@ internal sealed partial class ConverterForm
         }
         try
         {
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             using var process = new Process();
             process.StartInfo = new ProcessStartInfo { FileName = ffprobe, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
             foreach (var arg in new[] { "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", file })
@@ -367,13 +357,29 @@ internal sealed partial class ConverterForm
                 process.StartInfo.ArgumentList.Add(arg);
             }
             process.Start();
-            var output = process.StandardOutput.ReadToEnd().Trim();
-            process.WaitForExit(2500);
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+
+            try
+            {
+                await process.WaitForExitAsync(timeoutCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                return "";
+            }
+
+            var output = (await stdoutTask).Trim();
+            await stderrTask;
             return double.TryParse(output, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var seconds) ? TimeSpan.FromSeconds(seconds).ToString(seconds >= 3600 ? @"h\:mm\:ss" : @"m\:ss") : "";
         }
         catch (Exception ex)
         {
-            Logger.Warn("GetDurationText", ex);
+            Logger.Warn("GetDurationTextAsync", ex);
             return "";
         }
     }
@@ -393,7 +399,7 @@ internal sealed partial class ConverterForm
                 continue;
             }
 
-            var duration = await Task.Run(() => GetDurationText(ffprobe, item.Source));
+            var duration = await GetDurationTextAsync(ffprobe, item.Source);
             if (!queue.Contains(item) || IsDisposed || !IsHandleCreated)
             {
                 continue;

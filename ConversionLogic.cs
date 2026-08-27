@@ -46,6 +46,52 @@ internal static class ConversionLogic
         }
     }
 
+    public static string BuildOutputPath(
+        string source,
+        string rootFolder,
+        string outputFormat,
+        string namingRule,
+        bool useOutputFolder,
+        string outputFolder,
+        bool preserveFolders)
+    {
+        var baseName = BuildBaseName(Path.GetFileNameWithoutExtension(source), namingRule);
+        var fileName = baseName + "." + outputFormat.ToLowerInvariant();
+        var directory = Path.GetDirectoryName(source) ?? "";
+        if (useOutputFolder)
+        {
+            directory = outputFolder.Trim();
+            if (preserveFolders && !string.IsNullOrWhiteSpace(rootFolder))
+            {
+                directory = Path.Combine(directory, GetRelativeDirectory(rootFolder, Path.GetDirectoryName(source) ?? ""));
+            }
+        }
+        return Path.Combine(directory, fileName);
+    }
+
+    public static string GetUniqueDestination(string destination, string source, IEnumerable<string> reservedDestinations)
+    {
+        var reserved = reservedDestinations
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!File.Exists(destination) && !reserved.Contains(destination))
+        {
+            return destination;
+        }
+
+        var directory = Path.GetDirectoryName(destination) ?? "";
+        var name = Path.GetFileNameWithoutExtension(destination);
+        var extension = Path.GetExtension(destination);
+        var index = 1;
+        string candidate;
+        do
+        {
+            candidate = Path.Combine(directory, $"{name} ({index}){extension}");
+            index++;
+        } while (File.Exists(candidate) || reserved.Contains(candidate));
+        return candidate;
+    }
+
     public static string[] GetEncoderArgs(string format, string preset, string custom)
     {
         custom = custom.Trim();
@@ -63,7 +109,7 @@ internal static class ConversionLogic
             {
                 "Small file" => ["-codec:a", "libvorbis", "-q:a", "3"],
                 "High quality" => ["-codec:a", "libvorbis", "-q:a", "7"],
-                "Custom" => ["-codec:a", "libvorbis", "-b:a", string.IsNullOrWhiteSpace(custom) ? "192k" : custom],
+                "Custom" => ["-codec:a", "libvorbis", "-q:a", BitrateToVorbisQuality(custom)],
                 _ => ["-codec:a", "libvorbis", "-q:a", "5"]
             },
             "flac" => ["-codec:a", "flac"],
@@ -76,6 +122,34 @@ internal static class ConversionLogic
             },
             _ => throw new InvalidOperationException($"Unsupported output format: {format}")
         };
+    }
+
+    // Vorbis's own approximate quality-to-bitrate table (see xiph.org's vorbis-tools docs).
+    // libvorbis's managed-bitrate mode (-b:a) can reject bitrate/samplerate/channel combos
+    // outright ("encoder setup failed") - e.g. 192k on a mono 44.1kHz source. The -q:a VBR
+    // scale it's actually designed around has no such failure mode, so map the user's kbps
+    // target onto the nearest quality step instead of passing -b:a straight through.
+    private static readonly (int Kbps, int Quality)[] VorbisQualitySteps =
+    [
+        (45, -1), (64, 0), (80, 1), (96, 2), (112, 3), (128, 4), (160, 5), (192, 6), (224, 7), (256, 8), (320, 9), (500, 10)
+    ];
+
+    private static string BitrateToVorbisQuality(string custom)
+    {
+        var digits = new string(custom.TakeWhile(char.IsDigit).ToArray());
+        if (!int.TryParse(digits, out var kbps))
+        {
+            kbps = 192;
+        }
+        var closest = VorbisQualitySteps[0];
+        foreach (var step in VorbisQualitySteps)
+        {
+            if (Math.Abs(step.Kbps - kbps) < Math.Abs(closest.Kbps - kbps))
+            {
+                closest = step;
+            }
+        }
+        return closest.Quality.ToString();
     }
 
     /// <summary>

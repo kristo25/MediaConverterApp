@@ -12,7 +12,7 @@ internal sealed partial class ConverterForm
     {
         var confirm = MessageBox.Show(
             this,
-            "This downloads a static ffmpeg build (~80 MB) from gyan.dev - the Windows build ffmpeg.org's own download page recommends - and installs it under your local app data. Continue?",
+            "This convenience installer downloads a static ffmpeg build (~80 MB) from gyan.dev - the Windows build ffmpeg.org links to - over HTTPS and installs it under your local app data.\n\nNo checksum is pinned in this app, so if you prefer stricter verification, download ffmpeg manually and choose ffmpeg.exe from Settings (⚙).\n\nContinue?",
             "Install ffmpeg",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Question);
@@ -23,7 +23,7 @@ internal sealed partial class ConverterForm
 
         installFfmpegButton.Enabled = false;
         var previousStatus = statusLabel.Text;
-        var installRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MediaConverter", "ffmpeg");
+        var installRoot = Path.Combine(GetLocalDataRoot(), "ffmpeg");
         var zipPath = Path.Combine(Path.GetTempPath(), $"ffmpeg-install-{Guid.NewGuid():N}.zip");
 
         try
@@ -53,7 +53,7 @@ internal sealed partial class ConverterForm
             statusLabel.Text = previousStatus;
             MessageBox.Show(
                 this,
-                $"Could not install ffmpeg automatically: {ex.Message}\n\nYou can download it manually from https://ffmpeg.org/download.html and choose ffmpeg.exe with the ffmpeg button.",
+                $"Could not install ffmpeg automatically: {ex.Message}\n\nYou can download it manually from https://ffmpeg.org/download.html and choose ffmpeg.exe from Settings (⚙).",
                 "Install failed",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
