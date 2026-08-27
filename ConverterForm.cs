@@ -53,6 +53,7 @@ internal sealed partial class ConverterForm : Form
     private readonly Button summaryClearConvertedButton = new();
     private readonly Label statusLabel = new();
     private readonly ProgressBar progressBar = new();
+    private readonly Button installFfmpegButton = new();
 
     private CancellationTokenSource? conversionCancellation;
     private Process? activeProcess;
@@ -88,13 +89,14 @@ internal sealed partial class ConverterForm : Form
         var header = new Panel { Dock = DockStyle.Top, Height = 118, BackColor = currentTheme.Black, Padding = new Padding(18, 16, 18, 12) };
         var title = new Label { Text = "Media Converter", AutoSize = false, Height = 36, Dock = DockStyle.Top, Font = new Font("Segoe UI Semibold", 20f), ForeColor = currentTheme.Text };
         var subtitle = new Label { Text = "Drop audio or video files. Convert to MP3, WAV, OGG, FLAC, or M4A with safe logs and queue controls.", AutoSize = false, Height = 28, Dock = DockStyle.Top, ForeColor = currentTheme.Muted };
-        var themeLabel = new Label { Text = "Theme", Anchor = AnchorStyles.Top | AnchorStyles.Right, Location = new Point(920, 19), Size = new Size(58, 24), ForeColor = currentTheme.Muted, TextAlign = ContentAlignment.MiddleRight };
+        var themeLabel = new Label { Text = "THEME", Anchor = AnchorStyles.Top | AnchorStyles.Right, Location = new Point(792, 21), Size = new Size(76, 28), Font = new Font("Segoe UI Semibold", 10f), ForeColor = currentTheme.Text, TextAlign = ContentAlignment.MiddleRight };
 
         themeCombo.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         themeCombo.DropDownStyle = ComboBoxStyle.DropDownList;
         themeCombo.Items.AddRange(themes.Keys.OrderBy(name => name).Cast<object>().ToArray());
-        themeCombo.Location = new Point(986, 18);
-        themeCombo.Size = new Size(132, 28);
+        themeCombo.Location = new Point(878, 16);
+        themeCombo.Size = new Size(178, 36);
+        themeCombo.Font = new Font("Segoe UI Semibold", 11f);
         themeCombo.FlatStyle = FlatStyle.Flat;
         themeCombo.SelectedIndexChanged += (_, _) =>
         {
@@ -159,13 +161,23 @@ internal sealed partial class ConverterForm : Form
         statusLabel.ForeColor = currentTheme.Muted;
         statusLabel.TextAlign = ContentAlignment.MiddleLeft;
 
+        var statusRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = currentTheme.Black };
+        statusRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        statusRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+        installFfmpegButton.Text = "Install ffmpeg";
+        StyleButton(installFfmpegButton, currentTheme.Primary);
+        installFfmpegButton.Visible = false;
+        installFfmpegButton.Click += async (_, _) => await InstallFfmpegAsync();
+        statusRow.Controls.Add(statusLabel, 0, 0);
+        statusRow.Controls.Add(installFfmpegButton, 1, 0);
+
         main.Controls.Add(dropPanel, 0, 0);
         main.Controls.Add(controls, 0, 1);
         main.Controls.Add(hintLabel, 0, 2);
         main.Controls.Add(grid, 0, 3);
         main.Controls.Add(summary, 0, 4);
         main.Controls.Add(bottom, 0, 5);
-        main.Controls.Add(statusLabel, 0, 6);
+        main.Controls.Add(statusRow, 0, 6);
 
         Controls.Add(main);
         Controls.Add(header);
@@ -548,7 +560,7 @@ internal sealed partial class ConverterForm : Form
                 case DataGridView:
                     break;
                 case Label label:
-                    label.ForeColor = label.Font.Size >= 18 ? currentTheme.Text : currentTheme.Muted;
+                    label.ForeColor = label.Font.Size >= 18 || label.Text == "THEME" ? currentTheme.Text : currentTheme.Muted;
                     break;
                 case TableLayoutPanel table:
                     table.BackColor = currentTheme.Black;

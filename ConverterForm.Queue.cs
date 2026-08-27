@@ -348,7 +348,8 @@ internal sealed partial class ConverterForm
     private void UpdateFfmpegStatus()
     {
         var ffmpeg = GetFfmpegPath();
-        statusLabel.Text = ffmpeg is null ? "ffmpeg not found. Use the ffmpeg button to choose ffmpeg.exe." : $"Ready. ffmpeg: {ffmpeg}";
+        statusLabel.Text = ffmpeg is null ? "ffmpeg not found. Use the ffmpeg button to choose ffmpeg.exe, or Install ffmpeg." : $"Ready. ffmpeg: {ffmpeg}";
+        installFfmpegButton.Visible = ffmpeg is null;
     }
 
     private static string GetDurationText(string? ffprobe, string file)
